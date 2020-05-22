@@ -4,7 +4,6 @@ import java.util.ArrayList;
 
 /**
  * 配列から平均、標準偏差、中央値、最頻値を求めて、表示するクラス
- * @author ジンドビン
  */
 public class JavaSomeComplexd{
 
