@@ -5,6 +5,9 @@
         addCountryBtn : document.getElementById('addCountryBtn'),
         countryInput : document.getElementById('countryInput'),
         countryUl : document.getElementById('countryNamesUl'),
+        addImageBtn : document.getElementById('addImageBtn'),
+        previewDiv :   document.getElementById('div-preview'),
+        imgTag : document.getElementById('img-preview'),
 
         getCountries : function(){
             const countriesLis = [...this.countryUl.children];
@@ -46,6 +49,35 @@
                 }
             });
 
+        },
+
+        uploadImage : function(files){
+            console.log(files);
+            let fileNames = [];
+            let uploadSize = 0;
+            
+            for( file of files){
+                uploadSize += file.size;
+                fileNames.push(file.name)
+            }
+            if(uploadSize > 20971520  ){
+                alert('20MB 초과하는 이미지는 업로드 불가')
+                return;
+            }
+            console.log(files[0]);
+            const fileName = files[0].name;
+            this.previewDiv.innerHTMl = '';
+
+            const pageOrigin = window.location.origin;
+            const newImgSrc = `${pageOrigin}/img/${fileName}`;
+            
+            this.imgTag.src = newImgSrc;
+            
+            
+        },
+        getImage : function(fileName){
+            const folderPath = window.location.origin + '/img/';
+            console.log('wow');
         }
     }
 
@@ -63,3 +95,7 @@ removeCountryBtn.addEventListener('click', () => {
     mainModule.removeCountry(countryInput.value);
 });
 
+addImageBtn.addEventListener('change', () => {
+    // mainModule.uploadImage(addImageBtn.files);
+    mainModule.getImage(addImageBtn.files);
+});
