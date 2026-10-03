@@ -1,0 +1,5 @@
+[browser_capture]
+enabled = true
+browser = "chrome"
+timeout_seconds = 20
+grace_seconds = 1.0

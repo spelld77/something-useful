@@ -1,0 +1,27 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+.browser-profiles/
+.runtime/
+
+# Runtime data
+config.toml
+savedVideo/
+logs/
+history.jsonl
+failed_urls.txt
+file_history.jsonl
+urls.txt
+*.part
+*.ytdl
+
+# Test runtime files
+tests/runtime/*
+!tests/runtime/.gitkeep

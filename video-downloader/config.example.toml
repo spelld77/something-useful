@@ -1,0 +1,46 @@
+[app]
+save_dir = "savedVideo"
+timestamp = false
+overwrite = false
+
+[download]
+mode = "video"
+container = "mp4"
+video_quality = "best"
+audio_format = "mp3"
+audio_quality = "192K"
+concurrency = 1
+retries = 2
+socket_timeout_seconds = 30
+retry_sleep_seconds = 1.0
+
+[auth]
+browser = "none"
+profile = ""
+
+[youtube]
+js_runtime = "auto"
+remote_ejs = false
+retry_on_403 = true
+
+[batch]
+history_file = "history.jsonl"
+failed_file = "failed_urls.txt"
+resume = true
+delay_seconds = 2.0
+
+[browser_capture]
+enabled = false
+browser = "chrome"
+timeout_seconds = 90
+interactive_timeout_seconds = 180
+grace_seconds = 3.0
+
+[file_download]
+save_dir = "savedFiles"
+history_file = "file_history.jsonl"
+concurrency = 1
+retries = 2
+connect_timeout_seconds = 20
+read_timeout_seconds = 30
+resume_partial = true
