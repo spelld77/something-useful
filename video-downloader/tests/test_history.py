@@ -18,10 +18,13 @@ class HistoryTests(unittest.TestCase):
 
     def test_completed_keys_ignore_failures_and_corrupt_lines(self) -> None:
         store = HistoryStore(self.path)
+        output = RUNTIME_DIR / "history-output.mp4"
+        output.write_bytes(b"video")
+        self.addCleanup(output.unlink, missing_ok=True)
         completed = HistoryRecord.from_result(
             "https://example.com/complete",
             "video",
-            DownloadResult(success=True, output_path=Path("video.mp4")),
+            DownloadResult(success=True, output_path=output),
         )
         failed = HistoryRecord.from_result(
             "https://example.com/failed",
@@ -39,6 +42,20 @@ class HistoryTests(unittest.TestCase):
             keys,
             {(url_fingerprint("https://example.com/complete"), "video", "")},
         )
+        output.unlink()
+        self.assertEqual(store.completed_keys(), set())
+
+    def test_relative_history_paths_and_clear_keep_downloads(self) -> None:
+        output = self.path.parent / "legacy.mp4"
+        output.write_bytes(b"video")
+        self.addCleanup(output.unlink, missing_ok=True)
+        store = HistoryStore(self.path)
+        store.append(HistoryRecord("now", "hash", "video", "best", "completed", "legacy.mp4"))
+        self.assertEqual(store.completed_paths(), {("hash", "video", "best"): output.resolve()})
+        store.clear()
+        self.assertFalse(self.path.exists())
+        self.assertEqual(output.read_bytes(), b"video")
+        store.clear()
 
     def test_history_does_not_store_original_url(self) -> None:
         url = "https://example.com/video?token=secret"

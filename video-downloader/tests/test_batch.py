@@ -97,7 +97,10 @@ class BatchServiceTests(unittest.TestCase):
         self.assertIn("https://example.com/two", failed_text)
 
     def test_resume_skips_only_completed_url_and_mode(self) -> None:
-        first_engine = FakeEngine([DownloadResult(success=True)])
+        output = RUNTIME_DIR / "resume-output.mp4"
+        output.write_bytes(b"video")
+        self.addCleanup(output.unlink, missing_ok=True)
+        first_engine = FakeEngine([DownloadResult(success=True, output_path=output)])
         self._service(first_engine).run(["https://example.com/one"], mode="video")
         second_engine = FakeEngine([DownloadResult(success=True)])
 
@@ -118,6 +121,12 @@ class BatchServiceTests(unittest.TestCase):
         )
         self.assertEqual(summary.processed, 2)
         self.assertEqual(summary.unprocessed, 0)
+        self.assertEqual(events[0].result.output_path, output.resolve())
+        output.unlink()
+        third_engine = FakeEngine([DownloadResult(success=True)])
+        repeated = self._service(third_engine).run(["https://example.com/one"], mode="video")
+        self.assertEqual(repeated.skipped, 0)
+        self.assertEqual(len(third_engine.jobs), 1)
 
     def test_resume_does_not_skip_a_different_video_quality(self) -> None:
         self._service(FakeEngine([DownloadResult(success=True)])).run(

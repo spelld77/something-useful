@@ -43,7 +43,7 @@ class HistoryRecord:
             mode=mode,
             quality=quality if mode == "video" else "",
             status="completed" if result.success else "failed",
-            output_path=str(result.output_path) if result.output_path else "",
+            output_path=str(result.output_path.resolve()) if result.output_path else "",
             error_kind=str(result.error_kind) if result.error_kind else "",
             engine_version=engine_version,
             resolution=result.media_info.resolution if result.media_info else "",
@@ -63,9 +63,16 @@ class HistoryStore:
             history_file.write("\n")
 
     def completed_keys(self) -> set[tuple[str, str, str]]:
+        return set(self.completed_paths())
+
+    def clear(self) -> None:
+        """Clear job history only; never remove downloaded files."""
+        self.path.unlink(missing_ok=True)
+
+    def completed_paths(self) -> dict[tuple[str, str, str], Path]:
         if not self.path.exists():
-            return set()
-        completed: set[tuple[str, str, str]] = set()
+            return {}
+        completed: dict[tuple[str, str, str], Path] = {}
         with self.path.open("r", encoding="utf-8") as history_file:
             for line in history_file:
                 try:
@@ -77,8 +84,20 @@ class HistoryStore:
                 url_hash = payload.get("url_hash")
                 mode = payload.get("mode")
                 quality = payload.get("quality", "")
-                if isinstance(url_hash, str) and isinstance(mode, str):
-                    completed.add((url_hash, mode, quality if isinstance(quality, str) else ""))
+                output_text = payload.get("output_path")
+                if not isinstance(output_text, str) or not output_text:
+                    continue
+                output = Path(output_text)
+                if not output.is_absolute():
+                    output = self.path.parent / output
+                try:
+                    valid = output.is_file() and output.stat().st_size > 0
+                except OSError:
+                    valid = False
+                if valid and isinstance(url_hash, str) and isinstance(mode, str):
+                    completed[(url_hash, mode, quality if isinstance(quality, str) else "")] = (
+                        output
+                    )
         return completed
 
 

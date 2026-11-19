@@ -62,6 +62,8 @@ from videodownloader.gui_workers import (
 from videodownloader.models import DownloadResult, ErrorKind, MediaInfo, ProbeResult
 from videodownloader.preflight import format_report, run_preflight
 from videodownloader.service.batch import BatchItemEvent, BatchItemStatus, BatchSummary
+from videodownloader.storage.file_history import FileHistoryStore
+from videodownloader.storage.history import HistoryStore
 
 BROWSERS = (
     "none",
@@ -273,10 +275,14 @@ class MainWindow(QMainWindow):
         batch_button_row = QHBoxLayout()
         self.resume_checkbox = QCheckBox("완료한 항목 건너뛰기")
         self.resume_checkbox.setChecked(self.base_settings.batch.resume)
+        self.resume_checkbox.setToolTip("기록된 파일이 실제로 남아 있을 때만 건너뜁니다.")
+        self.video_history_clear_button = QPushButton("다운로드 이력 지우기")
+        self.video_history_clear_button.clicked.connect(lambda: self.clear_download_history(False))
         self.batch_button = QPushButton("일괄 다운로드 시작")
         self.batch_button.setObjectName("primaryButton")
         self.batch_button.clicked.connect(self.start_batch)
         batch_button_row.addWidget(self.resume_checkbox)
+        batch_button_row.addWidget(self.video_history_clear_button)
         batch_button_row.addStretch()
         batch_button_row.addWidget(self.batch_button)
         layout.addLayout(batch_button_row)
@@ -302,6 +308,9 @@ class MainWindow(QMainWindow):
         clear_button.clicked.connect(lambda: self.file_urls.clear())
         heading.addWidget(load_button)
         heading.addWidget(clear_button)
+        self.file_history_clear_button = QPushButton("다운로드 이력 지우기")
+        self.file_history_clear_button.clicked.connect(lambda: self.clear_download_history(True))
+        heading.addWidget(self.file_history_clear_button)
         layout.addLayout(heading)
 
         self.file_urls = QPlainTextEdit()
@@ -633,6 +642,37 @@ class MainWindow(QMainWindow):
         self.file_urls.setPlainText("\n".join(self._file_failed_urls))
         self.start_file_batch()
 
+    def clear_download_history(self, files: bool) -> None:
+        if self.worker is not None:
+            return
+        settings = self.current_settings()
+        store = (
+            FileHistoryStore(settings.file_download.history_file)
+            if files
+            else HistoryStore(settings.batch.history_file)
+        )
+        label = "일반 파일" if files else "영상"
+        answer = QMessageBox.question(
+            self,
+            "다운로드 이력 지우기",
+            f"{label} 다운로드 이력을 지울까요?\n{store.path}\n\n"
+            "받은 파일과 부분 파일은 유지됩니다. 이후에는 이력에 의한 건너뛰기를 하지 않습니다.\n"
+            "영상 이력의 성공·실패 기록도 함께 지워집니다.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            store.clear()
+        except OSError as exc:
+            self._show_error(f"이력을 지우지 못했습니다: {exc}")
+            return
+        message = f"{label} 다운로드 이력을 지웠습니다. 받은 파일은 유지됩니다."
+        self.statusBar().showMessage(message)
+        if not files:
+            self.batch_log.appendPlainText(message)
+
     @Slot()
     def clear_completed_file_items(self) -> None:
         if self.worker is not None and self.worker.isRunning():
@@ -913,8 +953,9 @@ class MainWindow(QMainWindow):
             )
         elif event.status == BatchItemStatus.SKIPPED:
             self._batch_skipped += 1
+            output = event.result.output_path if event.result else None
             self.batch_log.appendPlainText(
-                f"[{event.index}/{event.total}] 완료 이력으로 건너뜀: {url_label}"
+                f"[{event.index}/{event.total}] 기존 파일이 있어 건너뜀: {output or url_label}"
             )
         else:
             self._batch_cancelled += 1
@@ -1025,6 +1066,12 @@ class MainWindow(QMainWindow):
             self._batch_skipped += 1
             self._set_file_table_text(event.index, 2, "완료 이력으로 건너뜀")
             self._set_file_table_text(event.index, 3, "100%")
+            if result is not None and result.output_path is not None:
+                self._set_file_table_text(event.index, 1, result.output_path.name)
+                for column in (1, 2):
+                    item = self.file_table.item(self._file_rows[event.index], column)
+                    if item is not None:
+                        item.setToolTip(f"기존 파일이 있어 건너뜀: {result.output_path}")
         elif event.status == BatchItemStatus.CANCELLED:
             self._batch_cancelled += 1
             self._set_file_table_text(event.index, 2, "취소")
@@ -1181,6 +1228,8 @@ class MainWindow(QMainWindow):
             worker.deleteLater()
 
     def _set_busy(self, busy: bool) -> None:
+        self.video_history_clear_button.setEnabled(not busy)
+        self.file_history_clear_button.setEnabled(not busy)
         self.probe_button.setEnabled(not busy)
         self.download_button.setEnabled(not busy)
         self.web_download_button.setEnabled(not busy)

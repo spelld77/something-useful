@@ -8,7 +8,7 @@ from unittest.mock import patch
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtGui import QPalette  # noqa: E402
-from PySide6.QtWidgets import QApplication  # noqa: E402
+from PySide6.QtWidgets import QApplication, QMessageBox  # noqa: E402
 
 from videodownloader.config import AppConfig, Settings  # noqa: E402
 from videodownloader.gui import (  # noqa: E402
@@ -51,6 +51,29 @@ class FakeEngine:
 
 
 class GuiTests(unittest.TestCase):
+    def test_history_clear_requires_confirmation_and_is_blocked_while_busy(self) -> None:
+        window = MainWindow(Settings())
+        self.addCleanup(window.close)
+        for files, store_name in ((False, "HistoryStore"), (True, "FileHistoryStore")):
+            with (
+                patch(f"videodownloader.gui.{store_name}.clear") as clear,
+                patch("videodownloader.gui.QMessageBox.question") as question,
+            ):
+                question.return_value = QMessageBox.StandardButton.No
+                window.clear_download_history(files)
+                clear.assert_not_called()
+                question.return_value = QMessageBox.StandardButton.Yes
+                window.clear_download_history(files)
+                clear.assert_called_once()
+                window.worker = DownloadThread(Settings(), "https://example.com/x", "video")
+                window._set_busy(True)
+                window.clear_download_history(files)
+                clear.assert_called_once()
+                self.assertFalse(window.video_history_clear_button.isEnabled())
+                self.assertFalse(window.file_history_clear_button.isEnabled())
+                window.worker = None
+                window._set_busy(False)
+
     @classmethod
     def setUpClass(cls) -> None:
         cls.application = QApplication.instance() or QApplication([])

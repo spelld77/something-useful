@@ -270,6 +270,10 @@ class HttpFileEngineTests(unittest.TestCase):
         )
 
         self.assertEqual(resumed.skipped, 2)
+        self.assertTrue(all(event.result.output_path.is_file() for event in resumed_events))
+        FileHistoryStore(settings.history_file).clear()
+        self.assertFalse(settings.history_file.exists())
+        self.assertEqual(len(list(self.directory.glob("*.pdf"))), 2)
         self.assertEqual(
             [event.status for event in resumed_events],
             [BatchItemStatus.SKIPPED, BatchItemStatus.SKIPPED],

@@ -122,7 +122,7 @@ class BatchService:
         on_progress: ProgressCallback | None = None,
     ) -> BatchSummary:
         summary = BatchSummary(total=len(urls))
-        completed = self._completed_keys(summary) if resume else set()
+        completed = self._completed_paths(summary) if resume else {}
         history_quality = quality if mode == "video" else ""
 
         for index, url in enumerate(urls, start=1):
@@ -136,6 +136,7 @@ class BatchService:
                         total=len(urls),
                         url=url,
                         status=BatchItemStatus.SKIPPED,
+                        result=DownloadResult(True, output_path=completed[key]),
                     ),
                 )
                 continue
@@ -182,7 +183,8 @@ class BatchService:
             self._record_result(summary, url, mode, history_quality, result)
             if result.success:
                 summary.succeeded += 1
-                completed.add(key)
+                if result.output_path is not None and result.output_path.is_file():
+                    completed[key] = result.output_path.resolve()
                 status = BatchItemStatus.SUCCEEDED
             else:
                 summary.failed += 1
@@ -217,12 +219,12 @@ class BatchService:
         if callback is not None:
             callback(event)
 
-    def _completed_keys(self, summary: BatchSummary) -> set[tuple[str, str, str]]:
+    def _completed_paths(self, summary: BatchSummary) -> dict[tuple[str, str, str], Path]:
         try:
-            return self.history.completed_keys()
+            return self.history.completed_paths()
         except OSError as exc:
             summary.warnings.append(f"이력 파일을 읽을 수 없어 재개를 건너뜁니다: {exc}")
-            return set()
+            return {}
 
     def _record_result(
         self,

@@ -56,9 +56,9 @@ class FileBatchService:
             return summary
 
         try:
-            completed = self.history.completed_hashes() if resume else set()
+            completed = self.history.completed_paths() if resume else {}
         except OSError as exc:
-            completed = set()
+            completed = {}
             summary.warnings.append(f"파일 이력을 읽을 수 없어 재개를 건너뜁니다: {exc}")
 
         save_dir = self.settings.save_dir.expanduser().resolve()
@@ -72,7 +72,13 @@ class FileBatchService:
                 summary.skipped += 1
                 self._notify(
                     on_item_finished,
-                    BatchItemEvent(index, total, url, BatchItemStatus.SKIPPED),
+                    BatchItemEvent(
+                        index,
+                        total,
+                        url,
+                        BatchItemStatus.SKIPPED,
+                        DownloadResult(True, output_path=completed[url_fingerprint(url)]),
+                    ),
                 )
             else:
                 queue.append((index, url))

@@ -36,9 +36,16 @@ class FileHistoryStore:
             history_file.write("\n")
 
     def completed_hashes(self) -> set[str]:
+        return set(self.completed_paths())
+
+    def clear(self) -> None:
+        """Clear history only; keep completed and partial downloads."""
+        self.path.unlink(missing_ok=True)
+
+    def completed_paths(self) -> dict[str, Path]:
         if not self.path.is_file():
-            return set()
-        completed: set[str] = set()
+            return {}
+        completed: dict[str, Path] = {}
         with self.path.open("r", encoding="utf-8") as history_file:
             for line in history_file:
                 try:
@@ -55,10 +62,12 @@ class FileHistoryStore:
                 if isinstance(size, bool) or not isinstance(size, int):
                     continue
                 output_path = Path(output_text)
+                if not output_path.is_absolute():
+                    output_path = self.path.parent / output_path
                 try:
                     valid = output_path.is_file() and output_path.stat().st_size == size
                 except OSError:
                     valid = False
                 if valid:
-                    completed.add(url_hash)
+                    completed[url_hash] = output_path
         return completed
